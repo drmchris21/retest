@@ -29,16 +29,16 @@
 #define RESET "\x1B[0m"
 #define version "1.0"
 
-static const char *hs0=YEL "retest" RESET ": ";
-static const char *hs1="Test POSIX regular expressions\n"
+static const char *hs0 = YEL "retest" RESET ": ";
+static const char *hs1 = "Test POSIX regular expressions\n"
 	"2019 Manolis Christodoulou (mchris@mobi-doc.com)\n";
-static const char *hs=YEL "Syntax" RESET ": retest options\n"
+static const char *hs = YEL "Syntax" RESET ": retest options\n"
 	YEL "options" RESET ":-e: POSIX Extended regular expressions\n"
 	"\t-l: (any character) operators don't match newlines\n"
 	"\t-i: ignore case\n"
 	"\t--version\n"
 	"\t--help\n";
-static const char *hs2= "Enter string/regexp to test\n"
+static const char *hs2 = "Enter string/regexp to test\n"
 	"CTRL-D to exit.\n";
 
 static void help(int x) {
@@ -47,12 +47,12 @@ static void help(int x) {
 }
 
 void main(int a, char *as[]) {
-int cflags=REG_NOSUB;
+int cflags=0;
 char *s;
 	for (int n=1; n<a; n++) {
-		if (!strcmp(as[n],"-e")) cflags|=REG_EXTENDED;
-		else if (!strcmp(as[n],"-i")) cflags|=REG_ICASE;
-		else if (!strcmp(as[n],"-l")) cflags|=REG_NEWLINE;
+		if (!strcmp(as[n],"-e")) cflags |= REG_EXTENDED;
+		else if (!strcmp(as[n],"-i")) cflags |= REG_ICASE;
+		else if (!strcmp(as[n],"-l")) cflags |= REG_NEWLINE;
 		else if (!strcmp(as[n],"--version")) {
 			puts(version);
 			exit(0);
@@ -63,17 +63,31 @@ char *s;
 	printf("%s\n%s", hs1, hs2);
 	while (s=readline("\n\1" CYN "\2test/regexp: \1" RESET "\2")) {
 		add_history(s);
-		char *r=strtok(s, "/");
-		char *p=strtok(NULL, "/");
-		if (!r || !p) { free(s); continue; }
+		char *r = strtok(s, "/");
+		char *p = strtok(NULL, "/");
+		if (!r || !p) {
+			free(s);
+			continue;
+		}
 		regex_t rt;
 		if (regcomp(&rt, p, cflags)) {
 			printf(RED "%s: compiler error.\n", p);
 			free(s);
 			continue;
 		}
+
+		regmatch_t pmatch[32];
+		size_t nmatch=32;
 		printf("/" YEL "%s" RESET "/" YEL "%s" RESET"/ ",r,p);
-		(!regexec(&rt,r,0,NULL,0)) ? puts(GRN "MATCH!" RESET) : puts(RED "NO MATCH" RESET);
+		if (regexec(&rt,r,nmatch,pmatch,0) != 0) {
+			puts(RED "NO MATCH" RESET);
+		}
+		else {
+			puts(GRN "MATCH!" RESET);
+			for (short n=0; pmatch[n].rm_so != -1; n++) {
+				printf(GRN "Group %d: " RESET "%.*s" RED "%.*s" RESET "%.*s\n", n, pmatch[n].rm_so,s, pmatch[n].rm_eo-pmatch[n].rm_so, &s[pmatch[n].rm_so], (int)(strlen(s)-pmatch[n].rm_eo), &s[pmatch[n].rm_eo]);
+			}
+		}
 		regfree(&rt);
 		free(s);
 	}
